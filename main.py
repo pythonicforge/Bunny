@@ -47,7 +47,7 @@ if uploaded_file:
         canvas_result = st_canvas(
             fill_color="rgba(255, 255, 255, 0.3)",
             stroke_width=5,
-            background_image=doc_img,
+            background_image=np.array(doc_img),
             update_streamlit=True,
             height=doc_img.height,
             width=doc_img.width,
