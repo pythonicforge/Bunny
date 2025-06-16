@@ -44,10 +44,16 @@ if uploaded_file:
     if not st.session_state.points_selected:
         instruction_placeholder = st.empty()
 
+        # Convert PIL image to PNG bytes and reload as PIL Image for canvas compatibility
+        img_buffer = io.BytesIO()
+        doc_img.save(img_buffer, format="PNG")
+        img_buffer.seek(0)
+        doc_img_for_canvas = Image.open(img_buffer)
+
         canvas_result = st_canvas(
             fill_color="rgba(255, 255, 255, 0.3)",
             stroke_width=5,
-            background_image=np.array(doc_img),
+            background_image=doc_img_for_canvas,
             update_streamlit=True,
             height=doc_img.height,
             width=doc_img.width,
