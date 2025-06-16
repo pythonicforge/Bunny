@@ -1,0 +1,107 @@
+import streamlit as st
+from streamlit_drawable_canvas import st_canvas
+from PIL import Image
+from io import BytesIO
+import numpy as np
+import cv2
+import math
+
+def distance(p1, p2):
+    return math.hypot(p2[0] - p1[0], p2[1] - p1[1])
+
+if "points_selected" not in st.session_state:
+    st.session_state.points_selected = False
+
+if "points" not in st.session_state:
+    st.session_state.points = []
+
+st.markdown(
+    """
+    <h1 style='text-align: center; color: #555; margin-top: -2.5rem; font-family: system-ui'>
+        Bunny
+    </h1>
+    <p style='text-align: center; color: #555; margin-bottom: 5rem; font-family: system-ui; font-size: 1rem;'>Easily chnage the perspective of the objects from your images!</p>
+    """,
+    unsafe_allow_html=True
+)
+
+uploaded_file = st.file_uploader("Upload an image", type=["jpg", "png", "jpeg"])
+
+if uploaded_file:
+    doc_img = Image.open(uploaded_file).convert("RGB")
+    img_array = np.array(doc_img)
+
+    if not st.session_state.points_selected:
+        instruction_placeholder = st.empty()
+
+        canvas_result = st_canvas(
+            fill_color="rgba(255, 255, 255, 0.3)",
+            stroke_width=5,
+            background_image=doc_img,
+            update_streamlit=True,
+            height=doc_img.height,
+            width=doc_img.width,
+            drawing_mode="point",
+            point_display_radius=5,
+            key="canvas"
+        )
+
+        if canvas_result.json_data is not None:
+            objects = canvas_result.json_data["objects"]
+            num_objects = len(objects)
+
+            if num_objects == 4:
+                st.session_state.points = [[obj["left"], obj["top"]] for obj in objects]
+                st.session_state.points_selected = True
+                st.success("4 Points selected. Fixing perspective...")
+                st.experimental_rerun()
+            elif num_objects > 4:
+                instruction_placeholder.warning("You can only select 4 points! Refresh to reset.")
+            else:
+                instruction_placeholder.info(f"{num_objects} point(s) selected. Please select exactly 4.")
+        else:
+            instruction_placeholder.info("Click exactly 4 points on the image to fix the perspective")
+
+    
+    else:
+        points = st.session_state.points
+        src_pts = np.array(points, dtype=np.float32)
+
+        tl, tr, bl, br = points
+
+        widthA = distance(br, bl)
+        widthB = distance(tr, tl)
+        maxWidth = int(max(widthA, widthB))
+
+        heightA = distance(tr, br)
+        heightB = distance(tl, bl)
+        maxHeight = int(max(heightA, heightB))
+
+        dst_pts = np.array([
+            [0, 0],
+            [maxWidth, 0],
+            [0, maxHeight],
+            [maxWidth, maxHeight]
+        ], dtype=np.float32)
+
+        M = cv2.getPerspectiveTransform(src_pts, dst_pts)
+        warped = cv2.warpPerspective(img_array, M, (maxWidth, maxHeight))
+        warped_pil = Image.fromarray(warped)
+
+        st.image(warped, caption="Perspective Corrected", use_column_width=True)
+
+        img_buffer = BytesIO()
+        warped_pil.save(img_buffer, format="PNG")
+        img_buffer.seek(0)
+
+        st.download_button(
+            label="Download",
+            data=img_buffer,
+            file_name="corrected_document.png",
+            mime="image/png"
+        )
+
+        if st.button("Reset & Select Again"):
+            st.session_state.points_selected = False
+            st.session_state.points = []
+            st.experimental_rerun()
