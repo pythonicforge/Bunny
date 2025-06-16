@@ -15,6 +15,8 @@ if "points_selected" not in st.session_state:
 if "points" not in st.session_state:
     st.session_state.points = []
 
+st.set_page_config(layout="wide")
+
 st.markdown(
     """
     <h1 style='text-align: center; color: #555; margin-top: -2.5rem; font-family: system-ui'>
@@ -57,26 +59,19 @@ if uploaded_file:
                 st.experimental_rerun()
             elif num_objects > 4:
                 instruction_placeholder.warning("You can only select 4 points! Refresh to reset.")
-            else:
-                instruction_placeholder.info(f"{num_objects} point(s) selected. Please select exactly 4.")
         else:
             instruction_placeholder.info("Click exactly 4 points on the image to fix the perspective")
 
     
     else:
         points = st.session_state.points
-        src_pts = np.array(points, dtype=np.float32)
 
         tl, tr, bl, br = points
+        widthA, widthB = distance(br, bl), distance(tr, tl)
+        heightA, heightB = distance(tr, br), distance(tl, bl)
+        maxWidth, maxHeight = int(max(widthA, widthB)), int(max(heightA, heightB))
 
-        widthA = distance(br, bl)
-        widthB = distance(tr, tl)
-        maxWidth = int(max(widthA, widthB))
-
-        heightA = distance(tr, br)
-        heightB = distance(tl, bl)
-        maxHeight = int(max(heightA, heightB))
-
+        src_pts = np.array(points, dtype=np.float32)
         dst_pts = np.array([
             [0, 0],
             [maxWidth, 0],
@@ -88,7 +83,7 @@ if uploaded_file:
         warped = cv2.warpPerspective(img_array, M, (maxWidth, maxHeight))
         warped_pil = Image.fromarray(warped)
 
-        st.image(warped, caption="Perspective Corrected", use_column_width=True)
+        st.image(warped, caption="Perspective Corrected")
 
         img_buffer = BytesIO()
         warped_pil.save(img_buffer, format="PNG")
