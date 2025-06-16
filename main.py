@@ -1,10 +1,11 @@
 import streamlit as st
 from streamlit_drawable_canvas import st_canvas
 from PIL import Image
-from io import BytesIO
+import io
 import numpy as np
 import cv2
 import math
+import base64
 
 def distance(p1, p2):
     return math.hypot(p2[0] - p1[0], p2[1] - p1[1])
@@ -14,6 +15,13 @@ if "points_selected" not in st.session_state:
 
 if "points" not in st.session_state:
     st.session_state.points = []
+
+
+def image_to_base64(image: Image.Image) -> str:
+    buffered = io.BytesIO()
+    image.save(buffered, format="PNG")  # use "PNG" even for JPG to keep transparency support
+    img_str = base64.b64encode(buffered.getvalue()).decode()
+    return f"data:image/png;base64,{img_str}"
 
 st.set_page_config(layout="wide")
 
@@ -31,7 +39,7 @@ uploaded_file = st.file_uploader("Upload an image", type=["jpg", "png", "jpeg"])
 
 if uploaded_file:
     doc_img = Image.open(uploaded_file).convert("RGB")
-    img_array = np.array(doc_img)
+    img_data = image_to_base64(doc_img)
 
     if not st.session_state.points_selected:
         instruction_placeholder = st.empty()
@@ -80,12 +88,13 @@ if uploaded_file:
         ], dtype=np.float32)
 
         M = cv2.getPerspectiveTransform(src_pts, dst_pts)
-        warped = cv2.warpPerspective(img_array, M, (maxWidth, maxHeight))
+        img_np = np.array(doc_img)
+        warped = cv2.warpPerspective(img_np, M, (maxWidth, maxHeight))
         warped_pil = Image.fromarray(warped)
 
         st.image(warped, caption="Perspective Corrected")
 
-        img_buffer = BytesIO()
+        img_buffer = io.BytesIO()
         warped_pil.save(img_buffer, format="PNG")
         img_buffer.seek(0)
 
